@@ -1,0 +1,200 @@
+================================================================================
+COWRIE HONEYPOT: CONFIG-DRIVEN FINGERPRINTING VECTORS & RECOMMENDED CHANGES
+================================================================================
+This guide lists settings that can make your Cowrie instance easy to identify
+when deployed. Override these in cowrie.cfg (or etc/cowrie.cfg), not in
+cowrie.cfg.dist (dist is overwritten on updates).
+
+--------------------------------------------------------------------------------
+1. SSH VERSION STRING (High impact – first thing scanners see)
+--------------------------------------------------------------------------------
+Config: [ssh] version
+Where:  Sent in the very first line of the SSH handshake (e.g. nmap, ssh -v).
+Default in dist: SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3
+Code fallback:  SSH-2.0-OpenSSH_6.0p1 Debian-4+deb7u2
+
+Risk: Well-known Cowrie default strings are in public fingerprint DBs. Odd or
+      outdated version strings (e.g. Debian 7 on a “new” box) also stand out.
+
+What to change:
+  - Pick a version string that matches the OS/distro you’re pretending to be.
+  - Use a recent, plausible string for your chosen persona, e.g.:
+    - Ubuntu 22.04:  SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.10
+    - Debian 12:     SSH-2.0-OpenSSH_9.2p1 Debian-2+deb12u3
+    - RHEL/CentOS:   SSH-2.0-OpenSSH_8.0p1
+  - Rotate or randomize among a few strings if you want to avoid a single
+    static fingerprint (would require a small code change to read multiple
+    values).
+
+--------------------------------------------------------------------------------
+2. LISTEN PORT (High impact)
+--------------------------------------------------------------------------------
+Config: [ssh] listen_endpoints
+Default: tcp:2222:interface=0.0.0.0
+
+Risk: Port 2222 is the standard Cowrie SSH port. Many scanners and bots
+      specifically probe 2222 for honeypots.
+
+What to change:
+  - Use standard SSH port 22 if you can (requires root or capability like
+    setcap/cap_net_bind_service), or another common port (e.g. 2222 only if
+    you’re intentionally mimicking a secondary SSH).
+  - Example for port 22: listen_endpoints = tcp:22:interface=0.0.0.0
+  - Example for another port: listen_endpoints = tcp:10022:interface=0.0.0.0
+
+--------------------------------------------------------------------------------
+3. HOSTNAME (Medium impact – visible in prompt and commands)
+--------------------------------------------------------------------------------
+Config: [honeypot] hostname
+Default: svr04
+
+Risk: Generic or default hostnames (e.g. “svr04”) are commonly associated with
+      Cowrie. Your custom env selector already overrides this per session
+      (student-lab, ubuntu-desktop, staging-api); ensure the fallback when
+      not using the selector is also non-default.
+
+What to change:
+  - In cowrie.cfg set hostname to something plausible for your deployment, e.g.:
+    hostname = ip-10-0-1-42
+    or leave it and rely on your selector’s hostnames (server.py) so the
+    config fallback is only used when the selector isn’t.
+
+--------------------------------------------------------------------------------
+4. UNAME / KERNEL AND SYSTEM STRINGS (Medium impact)
+--------------------------------------------------------------------------------
+Config: [shell]
+  kernel_version     = 3.2.0-4-amd64
+  kernel_build_string = #1 SMP Debian 3.2.68-1+deb7u1
+  hardware_platform  = x86_64
+  operating_system   = GNU/Linux
+  ssh_version       = OpenSSH_7.9p1, OpenSSL 1.1.1a  20 Nov 2018
+
+Risk: “uname -a” and other commands expose these. Old Debian 7 kernel + newer
+      SSH version is inconsistent and can signal a fake system.
+
+What to change:
+  - Align with the OS you’re emulating and with [ssh] version:
+    - Debian 12:  kernel_version = 6.1.0-18-amd64
+                  kernel_build_string = #1 SMP PREEMPT_DYNAMIC Debian 6.1.76-1
+    - Ubuntu 22:  kernel_version = 5.15.0-91-generic
+                  kernel_build_string = #101-Ubuntu SMP ...
+  - Set ssh_version to match the same stack (e.g. OpenSSH_8.9p1 for Ubuntu 22).
+
+--------------------------------------------------------------------------------
+5. PRE-LOGIN BANNER (issue.net) (Medium impact)
+--------------------------------------------------------------------------------
+Config: Not in config – content is from the file:
+  <contents_path>/etc/issue.net
+  (contents_path from [honeypot] contents_path, default: honeyfs)
+
+Risk: Empty or default “Debian GNU/Linux 7” style text is a known Cowrie trait.
+      Banner is shown before login (e.g. ssh -v).
+
+What to change:
+  - Create or edit cowrie/honeyfs/etc/issue.net (or whatever path contents_path
+    resolves to) with a short, plausible banner for your chosen OS, e.g.:
+    “Ubuntu 22.04.3 LTS” or “Debian GNU/Linux 12” and optionally a legal line.
+  - Avoid text that explicitly mentions “honeypot” or “monitoring”.
+
+--------------------------------------------------------------------------------
+6. MOTD (Message of the day) (Lower impact)
+--------------------------------------------------------------------------------
+Config: Content comes from the virtual filesystem: /etc/motd (from honeyfs).
+
+Risk: Default or empty MOTD is less distinctive but can still be checked by
+      automated scripts.
+
+What to change:
+  - Ensure /etc/motd in your honeyfs (and in custom_fs* if you ship one) has
+    a generic, believable message (e.g. “Welcome to …”) and no “Cowrie” or
+    “honeypot” wording.
+
+--------------------------------------------------------------------------------
+7. TIMEZONE (Lower impact for fingerprinting, still useful for consistency)
+--------------------------------------------------------------------------------
+Config: [honeypot] timezone
+Default: UTC
+
+Risk: Usually not a direct fingerprint, but UTC everywhere can look generic.
+      Log timestamps and any commands that show time will use this.
+
+What to change:
+  - Set to a timezone that matches your persona (e.g. America/Chicago for a
+    “Texas” server). Keeps logs and behavior consistent.
+
+--------------------------------------------------------------------------------
+8. SENSOR NAME / LOGGING (Indirect – not seen by attacker, but avoid leaks)
+--------------------------------------------------------------------------------
+Config: [honeypot] sensor_name (optional)
+  If set, some output plugins use it in logs or external systems.
+
+Risk: If logs or alerts are ever exposed, names like “cowrie-prod” or
+      “honeypot-1” can confirm the system type.
+
+What to change:
+  - Use a neutral sensor_name (e.g. hostname or “sensor-01”) and avoid
+    “cowrie” or “honeypot” in names that might appear in SIEM/dashboards.
+
+--------------------------------------------------------------------------------
+9. OUTPUT PLUGINS THAT SEND “COWRIE” TO EXTERNAL SERVICES
+--------------------------------------------------------------------------------
+Some plugins send identifiable strings to third parties:
+  - output_virustotal: User-Agent “Cowrie Honeypot”, comment text mentioning
+    “#Cowrie SSH/telnet Honeypot”. If you use this plugin, consider customizing
+    or disabling the comment so submissions aren’t tagged as honeypot.
+  - output_splunk: default source/sourcetype “cowrie” – only affects your
+    Splunk; change if you don’t want “cowrie” in indices.
+
+These don’t change what the attacker sees on SSH but can matter for opsec.
+
+--------------------------------------------------------------------------------
+10. CIPHERS, MACs, KEX (Advanced / lower priority)
+--------------------------------------------------------------------------------
+Config: [ssh] ciphers, macs, compression
+
+Risk: The exact order and set of algorithms can produce a distinct “hassh” or
+      similar fingerprint. Many Cowrie instances share the same Twisted/Conch
+      defaults, which are known.
+
+What to change:
+  - Harder to fix purely in config: order/behavior may be dictated by the
+    library. For stronger de-fingerprinting, you’d need to align config with
+    a real OpenSSH build (e.g. copy from a real Ubuntu 22 server’s
+    sshd_config) and possibly patch the SSH transport layer to match that
+    order. Optional for a first pass.
+
+--------------------------------------------------------------------------------
+QUICK CHECKLIST FOR DEPLOYMENT
+--------------------------------------------------------------------------------
+[ ] Override [ssh] version with a plausible, consistent OpenSSH string.
+[ ] Change listen port from 2222 if possible (e.g. 22 or 10022).
+[ ] Set [honeypot] hostname (or rely on selector; keep fallback non-default).
+[ ] Align [shell] kernel_*, operating_system, ssh_version with that OS.
+[ ] Set honeyfs/etc/issue.net (and /etc/motd) to neutral, non-Cowrie text.
+[ ] Set [honeypot] timezone to match persona.
+[ ] Avoid “cowrie”/“honeypot” in sensor_name and in any external plugin text
+    (e.g. VirusTotal comment) if opsec matters.
+
+--------------------------------------------------------------------------------
+WHERE TO OVERRIDE
+--------------------------------------------------------------------------------
+Copy only the stanzas you need into cowrie.cfg (or etc/cowrie.cfg). Example
+minimal cowrie.cfg for less fingerprinting:
+
+  [honeypot]
+  hostname = ip-10-0-1-42
+  timezone = America/Chicago
+
+  [shell]
+  kernel_version = 5.15.0-91-generic
+  kernel_build_string = #101-Ubuntu SMP Tue Dec 10 20:34:49 UTC 2024
+  operating_system = GNU/Linux
+  ssh_version = OpenSSH_8.9p1 Ubuntu-3ubuntu0.10, OpenSSL 3.0.2 15 Mar 2022
+
+  [ssh]
+  version = SSH-2.0-OpenSSH_8.9p1 Ubuntu-3ubuntu0.10
+  listen_endpoints = tcp:22:interface=0.0.0.0
+
+Then create or edit honeyfs/etc/issue.net (and optionally /etc/motd) as above.
+
+================================================================================

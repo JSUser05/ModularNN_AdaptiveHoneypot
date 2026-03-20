@@ -1,0 +1,122 @@
+================================================================================
+ENVIRONMENT SELECTOR: RL POLICY DESIGN (NOT HRL)
+================================================================================
+
+GOAL
+----
+A policy that selects which honeypot environment (filesystem) to show based on
+attacker characteristics. For now: a simple RL policy with placeholder state
+that (1) makes one decision per session, (2) receives reward at session end, and
+(3) is structured so you can plug in attacker features later.
+
+
+Conclusion: Use normal RL (or more precisely a CONTEXTUAL BANDIT): one policy,
+one decision per session, reward at end.
+
+--------------------------------------------------------------------------------
+WHAT TYPE OF LEARNING?
+--------------------------------------------------------------------------------
+- CONTEXTUAL BANDIT fits best: context (state) -> action (which env) -> reward
+  (at session end). No sequential decisions within the session for this policy.
+- Options:
+  (A) Tabular Q(s,a): fine if state is discrete and small; harder when you add
+      many attacker features (state space blows up).
+  (B) Linear Q(s,a) = w · phi(s,a): state vector phi(s), one weight vector per
+      action; simple and works well when you add features (just increase phi).
+  (C) Small neural net: state -> Q(s,a) for 3 actions. Good when state becomes
+      high-dimensional or you want to learn non-linear patterns from features.
+
+Recommendation: Start with (C) a small feedforward net (e.g. state_dim -> 32
+-> 3) so that when you add attacker features you only change the state
+representation; the same network can learn from the new state. Use one-step
+Q-learning: when session ends, update Q(s,a) toward reward (no next-state;
+terminal step).
+
+--------------------------------------------------------------------------------
+BASIC RL IN THIS CONTEXT
+--------------------------------------------------------------------------------
+- State s:  For now a PLACEHOLDER (e.g. zeros or a constant); later = attacker
+  features (IP, client version, first few commands, etc.).
+- Actions a: 0 = custom_fs1, 1 = custom_fs2, 2 = custom_fs3.
+- Reward r:  Received once, at session end. Examples: session duration (seconds),
+  number of commands, whether they downloaded a file, or a combination. For
+  "engagement" you want to reward longer, more interactive sessions when you
+  showed the "right" environment.
+- No next state:  The session ends; this is a one-step transition (s, a, r).
+  So we use: target = r, loss = (Q(s,a) - r)^2 and update the network.
+
+Flow:
+  1. Session start: get state s (placeholder), policy chooses action a (env).
+  2. Store (session_id, s, a) so we can update later.
+  3. Session runs (Cowrie + command policy as today).
+  4. Session end: compute reward r from duration/commands/etc.; look up (s,a);
+     update Q(s,a) toward r; clear stored (session_id, s, a).
+
+--------------------------------------------------------------------------------
+PREPARING FOR ATTACKER FEATURES (ITERATION)
+--------------------------------------------------------------------------------
+- Keep a single function:  get_selector_state(session_info) -> vector.
+  - Now: session_info can be None or minimal; return a fixed-dim zero vector
+    (or random if you want to test learning).
+  - Later: session_info = (client_ip, client_version, time_of_day, ...);
+    return a real feature vector (same length or longer; you can increase dim
+    and retrain).
+- The rest of the pipeline (state -> action -> store -> reward -> update)
+  stays the same. You only change how state is computed.
+
+--------------------------------------------------------------------------------
+IMPLEMENTATION SKETCH
+--------------------------------------------------------------------------------
+- Module: cowrie.shell.env_selector_policy (lives next to selector; separate from cowrie.rl DQN).
+- Components:
+  1. get_selector_state(session_info) -> torch tensor or list of float.
+     Now: return zeros(state_dim). Later: use session_info to build features.
+  2. Policy: small Q-network: state -> [Q(s,0), Q(s,1), Q(s,2)]. Epsilon-
+     greedy action selection.
+  3. Pending store: dict[session_id] = (state, action). Filled when we record
+     the selection (after initFileSystem + when we have sessionno). Cleared
+     when we get reward for that session_id.
+  4. record_selection(session_id, state, action): store (state, action) for
+     session_id. Called from protocol when we have sessionno (connectionMade
+     or first place we have both server and sessionno).
+  5. report_reward(session_id, reward): look up (state, action), do one Q-
+     update (target = reward), remove from pending.
+- Hook 1: server.initFileSystem: get state, get action from policy, store
+  state/action on server, use action to pick env (as now).
+- Hook 2: protocol.connectionMade: get sessionno, server._selector_state,
+  server._selector_action -> policy.record_selection(sessionno, state, action).
+- Hook 3: on session.closed (e.g. in core/output.py or a small output plugin):
+  get sessionno, duration (and maybe command count); reward = f(duration);
+  policy.report_reward(sessionno, reward).
+
+--------------------------------------------------------------------------------
+REWARD SHAPING (LATER)
+--------------------------------------------------------------------------------
+Examples:
+  r = session_duration_seconds / scale
+  r = min(1.0, command_count / 10)
+  r = 0.5 * (duration_norm) + 0.5 * (commands_norm)
+  Optionally: small penalty for very short sessions (e.g. immediate disconnect)
+  so the policy learns to avoid environments that often get quick disconnects.
+
+--------------------------------------------------------------------------------
+IMPLEMENTATION SUMMARY (CODE)
+--------------------------------------------------------------------------------
+- cowrie.shell.env_selector_policy: get_selector_state(), EnvSelectorPolicy,
+  select_environment() -> (env_name, state_list, action), record_selection(),
+  report_reward(). State is STATE_DIM=4 zeros until you add features.
+- cowrie.shell.selector: select_environment(features) returns (name, state, action);
+  falls back to random if RL module is not importable.
+- cowrie.shell.server: initFileSystem() stores _selector_state and _selector_action
+  on the server after calling the selector.
+- cowrie.shell.protocol: connectionMade() calls record_selection(sessionno,
+  server._selector_state, server._selector_action). Imports from cowrie.shell.env_selector_policy.
+- cowrie.core.output: on cowrie.session.closed, computes reward = duration/60
+  and calls report_reward(sessionno, reward). Imports from cowrie.shell.env_selector_policy.
+
+To add attacker features later: change get_selector_state(session_info) to
+build a vector from session_info (e.g. pass client IP, SSH version, time, first
+command) and return it; increase STATE_DIM if needed. No other pipeline
+changes required.
+
+================================================================================

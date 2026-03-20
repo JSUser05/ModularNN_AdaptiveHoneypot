@@ -1,0 +1,96 @@
+Environment selector – where it goes and what to do
+=================================================
+
+Goal: Choose one of three filesystem environments (custom_fs1, custom_fs2, custom_fs3) when the honeypot needs a filesystem. For now, selection is random.
+
+---
+
+1. WHERE THE FILESYSTEM IS CHOSEN TODAY
+
+   - Cowrie does not pick the pickle path at session time. It reads a single path from config when building the filesystem object.
+   - The relevant code is in:
+     - cowrie/src/cowrie/shell/fs.py
+         - Class HoneyPotFilesystem.__init__(self, arch, home)
+         - It calls CowrieConfig.get("shell", "filesystem") to get the path, then opens that file and pickle.load()s it.
+     - cowrie/src/cowrie/shell/server.py
+         - initFileSystem(self, home) creates the filesystem: self.fs = fs.HoneyPotFilesystem(self.arch, home)
+         - initFileSystem is called when a new session starts (from shell/session.py and from filetransfer). So every new session gets a fresh HoneyPotFilesystem; that is when you have a chance to “select” which environment to use.
+
+   So the decision “which pickle?” must happen either:
+   - inside HoneyPotFilesystem.__init__ (so it uses a path that might come from a selector instead of always from config), or
+   - in server.initFileSystem before creating HoneyPotFilesystem (e.g. compute the path, then pass it in).
+
+   Recommendation: Resolve the path in one place (see below), then have HoneyPotFilesystem receive that path (from config or from the selector). That keeps fs.py focused on loading one given path.
+
+---
+
+2. CONFIG VS CODE
+
+   - Option A – Config only
+     - In cowrie/etc/cowrie.cfg (or .cfg.dist), add something like:
+       - [shell] filesystem_selector = random
+       - [shell] filesystem_options = var/lib/cowrie/custom_fs1.pickle,var/lib/cowrie/custom_fs2.pickle,var/lib/cowrie/custom_fs3.pickle
+     - If filesystem_selector is set, use filesystem_options and the selector to pick a path; otherwise use the existing “filesystem” option as today.
+   - Option B – Code only
+     - Hardcode the three paths and “random” in Python; no new config keys.
+   - Option C – Hybrid
+     - Config lists the three paths (or a single “directory of pickles”); selector type (e.g. random) in config or code.
+
+   For “random among three for now,” Option B is enough. If you want to add round-robin or weighted choice later, config (Option A or C) is useful.
+
+---
+
+3. OUTLINE OF WHAT TO DO
+
+   Step 1 – Define how the path is resolved
+   - Add a small helper (or a one-off function) that returns the path to the pickle file to use.
+   - Possible places for this helper:
+     - cowrie/src/cowrie/shell/fs.py (e.g. get_filesystem_path() at module level), or
+     - cowrie/src/cowrie/core/ or a new small module used by fs.py.
+   - Logic: if “use environment selector” (config or constant), pick one of the three paths at random; else return CowrieConfig.get("shell", "filesystem") as today. The three paths can be a constant list or come from config.
+
+   Step 2 – Use that path when creating the filesystem
+   - In fs.py, HoneyPotFilesystem.__init__:
+     - Instead of always doing path = CowrieConfig.get("shell", "filesystem"), set path = get_filesystem_path() (or equivalent). Then open(path) and pickle.load as now.
+   - Ensure the path is absolute or relative to the same place Cowrie already uses (e.g. state_path or current working directory). The existing “filesystem” config is typically relative to the cowrie process cwd or a config base path; keep the same convention for the three pickles.
+
+   Step 3 – Per-session randomness
+   - initFileSystem(home) is called once per new session. So if you call get_filesystem_path() inside HoneyPotFilesystem.__init__, each new session will get a new random choice. That gives “random environment per session,” which is what you want.
+
+   Step 4 – Edge cases
+   - If the chosen file is missing, either fall back to the default fs.pickle (or the single “filesystem” config) or log and exit. Falling back avoids breaking the honeypot if one pickle was deleted.
+   - Ensure the three pickles (custom_fs1, custom_fs2, custom_fs3) are generated and present under var/lib/cowrie/ as you already do; the selector only chooses among them.
+
+   Step 5 – (Optional) Config for paths and selector type
+   - Later you can add [shell] filesystem_selector = random and filesystem_options = path1,path2,path3 (or a directory). Then get_filesystem_path() reads those and picks accordingly. No need for this until you want non-random or configurable lists.
+
+---
+
+4. FILES TO TOUCH (summary)
+
+   - cowrie/src/cowrie/shell/fs.py
+     - Add path resolution (selector or config) and use it in HoneyPotFilesystem.__init__ when opening the pickle. Optionally a small get_filesystem_path() here or in a helper module.
+   - cowrie/etc/cowrie.cfg (or your local override)
+     - Only if you add config keys for selector or paths; otherwise no change.
+   - Optional: a new module (e.g. cowrie/src/cowrie/shell/env_selector.py) that returns a path given a list and a strategy (“random”); then fs.py calls it. Keeps fs.py simpler if the logic grows.
+
+---
+
+5. RANDOM CHOICE IN PYTHON
+
+   - Use the standard library: import random; path = random.choice(list_of_pickle_paths). No need for numpy or extra deps.
+   - If you ever want reproducibility (e.g. for tests), you can seed random or pass a seed from config; for now, plain random is fine.
+
+---
+
+6. TESTING THE SELECTOR
+
+   - Start Cowrie, open several SSH sessions (e.g. with your interactor or manually). Check that different sessions can land in different environments (e.g. run ls /home or ls / and compare). Or add a temporary log line in fs.py that logs the chosen path so you can confirm it varies.
+   - If you use a single “filesystem” config and no selector, behavior should stay as today (one pickle for all).
+
+---
+
+7. SUMMARY
+
+   - Where: Resolve the pickle path in or before HoneyPotFilesystem.__init__ in cowrie/src/cowrie/shell/fs.py; optionally factor path resolution into a helper or a small env_selector module.
+   - What: Implement “pick one of [custom_fs1.pickle, custom_fs2.pickle, custom_fs3.pickle] at random” when creating the filesystem for each session; otherwise use the existing config “filesystem” path. Use that path to open and pickle.load the tree. Handle missing file (fallback or exit). No code written here—this outline is your map; ask when you want to implement a specific step.

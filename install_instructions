@@ -1,0 +1,5 @@
+cowrie install requires being attached (we are not)
+
+workaround (requires python3.11+):
+
+cd cowrie; python3 -m venv cowrie-venv; source cowrie-venv/bin/activate; python -c 'import tomllib, pathlib; d=tomllib.loads(pathlib.Path("pyproject.toml").read_text())'; export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_COWRIE=0.0.0; python -m pip install -e .

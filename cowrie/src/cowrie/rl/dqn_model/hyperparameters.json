@@ -1,0 +1,38 @@
+{
+  "GAMMA": 0.99,
+  "LR": 0.01,
+  "DICTIONARY_SIZE": 100,
+  "EMBEDDED_DIM": 64,
+  "NUM_ACTIONS": 5,
+  "DROPOUT": 0.2,
+  "HIDDEN_LAYER1": 128,
+  "HIDDEN_LAYER2": 64,
+  "MAX_BUFFER_SIZE": 100000,
+  "MIN_BUFFER_SIZE": 64,
+  "BATCH_SIZE": 70,
+  "USE_SARSA": false,
+  "EPSILON": 0.75,
+  "ACTION_NAMES": [
+    "allow",
+    "block",
+    "delay",
+    "fake",
+    "insult"
+  ],
+  "ACTION_IDS": {
+    "ALLOW": 0,
+    "BLOCK": 1,
+    "DELAY": 2,
+    "FAKE": 3,
+    "INSULT": 4
+  },
+  "REWARD_STANDARD": 1,
+  "INPUT_LENGTH": 1,
+  "REWARD_WEIGHT": 2.0,
+  "TARGET_UPDATE_INTERVAL": 50,
+  "USE_EPSILON_DECAY": false,
+  "EPSILON_MIN": 0.1,
+  "EPSILON_DECAY_START_EPISODE": 200,
+  "EPSILON_DECAY_STEPS": 1200,
+  "MODEL_SAVE_INTERVAL": 500
+}

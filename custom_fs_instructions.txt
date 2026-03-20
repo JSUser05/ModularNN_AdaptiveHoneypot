@@ -1,0 +1,106 @@
+Creating a Custom Pickled Filesystem for Cowrie (ModularDQN_AdaptiveHoneypot)
+=============================================================
+
+Goal
+----
+Replace the default Cowrie filesystem pickle (fs.pickle) with a custom one generated from a directory tree containing dummy files and directories.
+
+High-level steps
+----------------
+1. Create a source directory tree with dummy files.
+2. Run Cowrie's createfs.py to generate a new pickle from that tree.
+3. Point Cowrie's configuration to the new pickle.
+4. (Optional) Add real file contents using honeyfs/.
+
+Step 2 – Generate the filesystem pickle with createfs.py
+--------------------------------------------------------
+Activate the Cowrie virtualenv and run createfs.py from inside the cowrie directory:
+
+    cd /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot/cowrie
+    source cowrie-venv/bin/activate
+
+    # -l : source directory for the fake filesystem (relative to this cwd)
+    # -d : maximum recursion depth (20 is usually enough)
+    # -o : output pickle path (relative to this cwd)
+    python src/cowrie/scripts/createfs.py \
+        -l ../custom_fs \
+        -d 20 \
+        -o var/lib/cowrie/custom_fs.pickle
+
+This creates:
+
+    /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot/cowrie/var/lib/cowrie/custom_fs.pickle
+
+Step 3 – Tell Cowrie to use the new pickle
+------------------------------------------
+Option A – cowrie.cfg
+
+Edit the Cowrie config file and set the filesystem under the [shell] section, for example in:
+
+    /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot/cowrie/etc/cowrie.cfg
+
+Add or modify:
+
+    [shell]
+    filesystem = var/lib/cowrie/custom_fs.pickle
+
+Option B – environment variable (no config edit)
+
+Before starting Cowrie (or before run_interactor.py starts it), set:
+
+    cd /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot/cowrie
+    export COWRIE_SHELL_FILESYSTEM=var/lib/cowrie/custom_fs.pickle
+
+Cowrie will prefer this environment variable over the default filesystem path in the config.
+
+Step 4 – Start Cowrie and verify
+--------------------------------
+Start Cowrie using your existing script, for example:
+
+    cd /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot/cowrie
+    bin/cowrie start
+
+or from the ModularDQN_AdaptiveHoneypot root:
+
+    cd /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot
+    python run_interactor.py -n 10 --max 5
+
+Once Cowrie is running, SSH into it manually to check that the fake filesystem is visible:
+
+    ssh -p 2222 root@127.0.0.1
+
+Then run:
+
+    ls /
+    ls /etc
+    cat /etc/motd
+    ls /home/root
+    ls /opt/tools
+
+You should see the dummy files you defined in custom_fs/.
+
+Step 5 (optional) – Use honeyfs/ for real contents
+--------------------------------------------------
+If you want certain files to have specific contents (beyond simple dummy text), place them under cowrie/honeyfs using the same path they have in the fake filesystem.
+
+Examples:
+
+    cd /Users/joshuasosa/Desktop/UTSA/IndpWork/ModularDQN_AdaptiveHoneypot/cowrie
+    mkdir -p honeyfs/etc
+    echo "Real MOTD from honeyfs" > honeyfs/etc/motd
+
+    mkdir -p honeyfs/opt/tools
+    echo "real-looking binary data" > honeyfs/opt/tools/malware.bin
+
+At runtime:
+  - The directory structure and metadata (permissions, owner, size) come from custom_fs.pickle.
+  - The actual file content is taken from honeyfs/ when a matching path exists.
+
+Summary
+-------
+1. Build a dummy directory tree under custom_fs/.
+2. Run createfs.py to generate var/lib/cowrie/custom_fs.pickle.
+3. Point Cowrie at this pickle via cowrie.cfg or COWRIE_SHELL_FILESYSTEM.
+4. (Optional) Override file contents via cowrie/honeyfs/.
+5. Start Cowrie and verify the environment via SSH.
+
