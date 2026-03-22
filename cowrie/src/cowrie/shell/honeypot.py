@@ -19,7 +19,7 @@ from cowrie.core.config import CowrieConfig
 from cowrie.shell import fs
 from cowrie.shell.parser import CommandParser
 from cowrie.shell.pipe import PipeProtocol
-from cowrie.rl.dqn_model.agent import decide_action, reset_session
+from honeypot_rl.dqn_model.agent import decide_action, reset_session
 
 # Pre-compiled regexes for environment variable expansion
 _ENV_BRACE_RE = re.compile(r"^\${([_a-zA-Z0-9]+)}$")

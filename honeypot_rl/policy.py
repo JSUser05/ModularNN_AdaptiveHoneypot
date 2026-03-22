@@ -16,7 +16,7 @@ class Policy:
             pad = self.input_length - len(ids)
             ids = [0] * pad + ids
         else:
-            ids = ids[-self.input_length:]
+            ids = ids[-self.input_length :]
         return torch.tensor([ids], dtype=torch.long)
 
     def __decide__(self, s_id, inp) -> tuple:

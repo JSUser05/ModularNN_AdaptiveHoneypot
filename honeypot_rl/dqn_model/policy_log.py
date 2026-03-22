@@ -3,9 +3,9 @@ import os
 import sys
 from typing import Optional, List
 
-# WARNING: NOT VERIFIED YET, ALL CODE BELOW IS CREATED BY ANTHROPIC 
+# honeypot_rl/dqn_model -> repo root -> cowrie/
 _this_dir = os.path.dirname(os.path.abspath(__file__))
-cowrie_root = os.path.normpath(os.path.join(_this_dir, "..", "..", ".."))
+cowrie_root = os.path.normpath(os.path.join(_this_dir, "..", "..", "cowrie"))
 POLICY_LOG_PATH = os.path.join(cowrie_root, "var", "log", "cowrie", "policy.log")
 
 

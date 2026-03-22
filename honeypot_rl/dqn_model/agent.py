@@ -5,10 +5,10 @@ import torch
 from collections import deque
 
 from cowrie.commands import __all__ as COMMANDS
-from cowrie.rl.dqn_model.q_network import QNetwork
-from cowrie.rl.dqn_model.online_trainer import OnlineTrainer
-from cowrie.rl.dqn_model.policy_log import write_policy_decision
-from cowrie.rl.reward.qrassh_reward import QRaSSHReward
+from honeypot_rl.dqn_model.q_network import QNetwork
+from honeypot_rl.dqn_model.online_trainer import OnlineTrainer
+from honeypot_rl.dqn_model.policy_log import write_policy_decision
+from honeypot_rl.reward.qrassh_reward import QRaSSHReward
 
 # QRaSSH parameters and training model path
 DQN_MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -123,7 +123,7 @@ class agent:
 
         self.command_history.append(cmd_id)
 
-        # ******Handling the length of the state****** 
+        # ******Handling the length of the state******
         if INPUT_LENGTH == 1:
             state_list = [cmd_id]
         else:
@@ -147,7 +147,7 @@ class agent:
                 reward_s_id = s_id[-1]
             else:
                 reward_s_id = 0
-        # ******Handling the length of the state****** 
+        # ******Handling the length of the state******
 
         self.model.eval()
         with torch.no_grad():

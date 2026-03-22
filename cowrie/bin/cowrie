@@ -8,9 +8,14 @@ PIDFILE="$BASE_DIR/var/run/cowrie.pid"
 
 . "$VENV_BIN/activate"
 
+REPO_ROOT="$(cd "$BASE_DIR/.." && pwd)"
+export PYTHONPATH="$REPO_ROOT:${BASE_DIR}/src:${PYTHONPATH:-}"
+
 start() {
   echo "Starting Cowrie..."
+  cd "$BASE_DIR"
   exec "$VENV_BIN/twistd" --umask=0022 \
+    --rundir "$BASE_DIR" \
     --pidfile "$PIDFILE" \
     --logger cowrie.python.logfile.logger cowrie
 }

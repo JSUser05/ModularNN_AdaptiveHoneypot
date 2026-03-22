@@ -3,9 +3,9 @@ import os
 import copy
 import torch
 
-from cowrie.rl.dqn_model.replay_buffer import ReplayBuffer
-from cowrie.rl.dqn_model.Trainer import Training
-from cowrie.rl.dqn_model.policy_log import get_policy_log_path
+from honeypot_rl.dqn_model.replay_buffer import ReplayBuffer
+from honeypot_rl.dqn_model.Trainer import Training
+from honeypot_rl.dqn_model.policy_log import get_policy_log_path
 
 DQN_MODEL_DIR = os.path.dirname(os.path.abspath(__file__))
 TRAINED_MODEL_PATH = os.path.join(DQN_MODEL_DIR, "trained_model.pt")

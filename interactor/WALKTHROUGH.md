@@ -138,11 +138,11 @@ So `cmd_continue.json` controls “after this action on this state, do we keep s
 After running the interactor (and/or real traffic), you can plot Q-values from `policy.log`:
 
 ```bash
-# From ModularDQN_AdaptiveHoneypot root; uses default policy log path
-python -m cowrie.qrassh.plot_q_values
+# From repo root; uses default policy log path
+python -m honeypot_rl.dqn_model.plot_q_values
 
 # Custom log path or save figure
-python -m cowrie.qrassh.plot_q_values cowrie/var/log/cowrie/policy.log -o q_values.png
+python -m honeypot_rl.dqn_model.plot_q_values cowrie/var/log/cowrie/policy.log -o q_values.png
 ```
 
 Requires **matplotlib** (`pip install matplotlib` or use Cowrie’s venv).

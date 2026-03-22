@@ -21,7 +21,7 @@ from twisted.python import failure, log
 
 import cowrie.commands
 from cowrie.core.config import CowrieConfig
-from cowrie.rl.dqn_model.agent import reset_session
+from honeypot_rl.dqn_model.agent import reset_session
 from cowrie.shell import command, honeypot
 from cowrie import data
 

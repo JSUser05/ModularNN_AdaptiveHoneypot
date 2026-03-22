@@ -4,8 +4,8 @@ Plot Q-values per command input behavior group (from interactor cmd_continue.jso
 and per action (allow, block, delay, fake, insult).
 
 Usage:
-  python -m cowrie.qrassh.plot_q_values [path_to_policy.log]
-  Or from qrassh dir: python plot_q_values.py [path_to_policy.log]
+  python -m honeypot_rl.dqn_model.plot_q_values [path_to_policy.log]
+  Or: python honeypot_rl/dqn_model/plot_q_values.py [path_to_policy.log]
 """
 import argparse
 import json
@@ -19,12 +19,10 @@ ACTION_NAMES = ["allow", "block", "delay", "fake", "insult"]
 
 
 def find_interactor_dir():
-    """Resolve path to ModularDQN_AdaptiveHoneypot/interactor from this script (cowrie/src/cowrie/rl/dqn_model)."""
-    _this = os.path.dirname(os.path.abspath(__file__))
-    # cowrie/src/cowrie/rl/dqn_model -> go up to ModularDQN_AdaptiveHoneypot
-    for _ in range(5):
-        _this = os.path.dirname(_this)
-    return os.path.join(_this, "interactor")
+    """Resolve path to repo/interactor from honeypot_rl/dqn_model."""
+    _this_dir = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.normpath(os.path.join(_this_dir, "..", ".."))
+    return os.path.join(repo_root, "interactor")
 
 
 def load_cmd_continue(interactor_dir: str):
@@ -88,9 +86,8 @@ def load_policy_log(path: str, greedy_only: bool = False):
 
 def main():
     _this_dir = os.path.dirname(os.path.abspath(__file__))
-
-    _cowrie_root = os.path.normpath(os.path.join(_this_dir, "..", "..", "..", ".."))
-    default_path = os.path.join(_cowrie_root, "var", "log", "cowrie", "policy.log")
+    repo_root = os.path.normpath(os.path.join(_this_dir, "..", ".."))
+    default_path = os.path.join(repo_root, "cowrie", "var", "log", "cowrie", "policy.log")
     interactor_dir = find_interactor_dir()
 
     parser = argparse.ArgumentParser(
