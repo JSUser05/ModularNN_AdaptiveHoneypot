@@ -10,8 +10,8 @@ This project combines a Cowrie SSH honeypot with reinforcement-learning componen
 
 - `honeypot_rl/` - **Reinforcement learning code** (DQN agent, replay buffer, rewards, policy logging, plotting). Kept at the repo root so it is easy to review separately from the Cowrie tree.
 - `cowrie/` - Cowrie source and runtime assets (shell/protocol hooks import `honeypot_rl`).
-- `interactor/` - session-driving tools and command datasets.
-- `run_interactor.py` - entrypoint for automated interaction runs.
+- `interactor/` - **not** in the remote repo (gitignored); keep your own copy locally for session-driving tools and command datasets.
+- `run_interactor.py` - entrypoint for automated interaction runs (expects a local `interactor/` package).
 - `start_cowrie.sh` - helper script to start or restart the local Cowrie instance.
 
 ## Quick Start

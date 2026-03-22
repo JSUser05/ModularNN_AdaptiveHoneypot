@@ -28,3 +28,6 @@ cowrie/.pydevproject
 cowrie/.idea/
 cowrie/.tox
 .idea/
+
+# Local-only: keep interactor on disk but do not commit
+interactor/
